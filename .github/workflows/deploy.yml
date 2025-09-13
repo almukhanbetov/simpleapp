@@ -48,7 +48,12 @@ jobs:
           EOF
 
       - name: Deploy Postgres (if not exists)
-        run: kubectl apply -f k8s/postgres.yaml
+        run: |
+          if ! kubectl get statefulset postgres -n default >/dev/null 2>&1; then
+            kubectl apply -f k8s/postgres.yaml
+          else
+            echo "Postgres already exists, skipping..."
+          fi
 
       - name: Wait for Postgres ready
         run: kubectl rollout status statefulset/postgres -n default --timeout=180s
