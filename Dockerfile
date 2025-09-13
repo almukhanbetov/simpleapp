@@ -2,8 +2,8 @@ FROM golang:1.22-alpine AS build
 
 WORKDIR /app
 
-# Добавляем git, чтобы go install работал
-RUN apk add --no-cache git
+# Добавляем git и тулзы для сборки
+RUN apk add --no-cache git build-base
 
 # Установим goose
 RUN go install github.com/pressly/goose/v3/cmd/goose@latest
