@@ -1,0 +1,43 @@
+name: CI/CD Deploy SimpleApp
+
+on:
+  push:
+    branches: [ "main" ]
+
+env:
+  IMAGE_NAME: almuko/simpleapp
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_PASSWORD }}
+
+      - name: Build and Push Docker Image
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          push: true
+          tags: ${{ env.IMAGE_NAME }}:latest
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    steps:
+      - name: Setup Kubeconfig
+        run: |
+          mkdir -p $HOME/.kube
+          echo "${{ secrets.KUBECONFIG }}" > $HOME/.kube/config
+
+      - name: Deploy Postgres (if not exists)
+        run: kubectl apply -f k8s/postgres.yaml
+
+      - name: Deploy App (SimpleApp + Migrations + Ingress)
+        run: kubectl apply -f k8s/simpleapp.yaml
