@@ -48,7 +48,8 @@ jobs:
           EOF
 
       - name: Deploy ClusterIssuer (Let's Encrypt)
-        run: kubectl apply -f k8s/cluster-issuer.yaml
+        run: kubectl apply --validate=false -f k8s/cluster-issuer.yaml
+
 
       - name: Deploy Postgres (only if not exists)
         run: |
