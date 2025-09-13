@@ -1,0 +1,29 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: simpleapp-migrate
+  namespace: default
+spec:
+  backoffLimit: 3
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: migrate
+          image: almuko/simpleapp:latest   # 👈 твой образ
+          imagePullPolicy: IfNotPresent
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              echo "⏳ Ждём PostgreSQL..."
+              until pg_isready -h postgres -p 5432 -U myuser; do
+                sleep 2
+              done
+              echo "✅ PostgreSQL готов, запускаем миграции..."
+              goose -dir /app/migrations postgres "$DATABASE_URL" up
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: simpleapp-db-secret
+                  key: url
