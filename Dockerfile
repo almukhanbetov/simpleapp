@@ -4,7 +4,7 @@ WORKDIR /app
 COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
-RUN go build -o simpleapp ./cmd/main.go
+RUN go build -o simpleapp ./main.go
 
 # Runtime stage
 FROM alpine:latest
