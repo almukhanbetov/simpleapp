@@ -69,9 +69,9 @@ metadata:
   name: simpleapp-ingress
   namespace: default
   annotations:
-    kubernetes.io/ingress.class: "nginx"
-    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"   # ⬅️ cert-manager будет выпускать сертификаты
 spec:
+  ingressClassName: traefik
   tls:
   - hosts:
     - simpleapp.compnet.kz

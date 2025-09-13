@@ -47,16 +47,25 @@ jobs:
           ${{ secrets.KUBECONFIG }}
           EOF
 
-      - name: Deploy Postgres (if not exists)
+      - name: Deploy ClusterIssuer (Let's Encrypt)
+        run: kubectl apply -f k8s/cluster-issuer.yaml
+
+      - name: Deploy Postgres (only if not exists)
         run: |
           if ! kubectl get statefulset postgres -n default >/dev/null 2>&1; then
+            echo "Postgres not found. Creating..."
             kubectl apply -f k8s/postgres.yaml
+            kubectl rollout status statefulset/postgres -n default --timeout=180s
           else
-            echo "Postgres already exists, skipping..."
+            echo "Postgres already exists. Skipping creation."
           fi
 
-      - name: Wait for Postgres ready
-        run: kubectl rollout status statefulset/postgres -n default --timeout=180s
+      - name: Cleanup old migration job (if exists)
+        run: |
+          if kubectl get job simpleapp-migrate -n default >/dev/null 2>&1; then
+            echo "Deleting old migration job..."
+            kubectl delete job simpleapp-migrate -n default
+          fi
 
       - name: Deploy App (Secret + Migrations + Deployment + Service + Ingress)
         run: kubectl apply -f k8s/simpleapp.yaml
@@ -65,10 +74,21 @@ jobs:
         run: |
           sleep 5
           kubectl wait --for=condition=complete job/simpleapp-migrate -n default --timeout=180s || \
-            (echo "Migrations job did not complete" && kubectl logs job/simpleapp-migrate -n default && exit 1)
+            (echo "❌ Migrations job did not complete" && kubectl logs job/simpleapp-migrate -n default && exit 1)
 
       - name: Wait for app rollout
         run: kubectl rollout status deployment/simpleapp -n default --timeout=180s
+
+      - name: Wait for TLS certificate
+        run: |
+          echo "⏳ Waiting for TLS certificate simpleapp-tls..."
+          kubectl wait --for=condition=Ready certificate/simpleapp-tls -n default --timeout=300s || \
+            (echo "❌ TLS certificate was not issued" && kubectl describe certificate simpleapp-tls -n default && exit 1)
+
+      - name: Test API health endpoint
+        run: |
+          echo "🌍 Testing API endpoint..."
+          curl -vk --retry 5 --retry-delay 10 https://simpleapp.compnet.kz/health | grep '"status":"ok"'
 
       - name: Show Ingress and endpoints
         run: |
