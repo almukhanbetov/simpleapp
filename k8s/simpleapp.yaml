@@ -1,35 +1,11 @@
-apiVersion: batch/v1
-kind: Job
+apiVersion: v1
+kind: Secret
 metadata:
-  name: simpleapp-migrate
+  name: simpleapp-db-secret
   namespace: default
-spec:
-  backoffLimit: 3
-  template:
-    spec:
-      restartPolicy: Never
-      initContainers:
-        - name: wait-for-postgres
-          image: appropriate/curl
-          command:
-            - sh
-            - -c
-            - |
-              until curl postgres:5432; do
-                echo "⏳ waiting for postgres..."
-                sleep 2
-              done
-              echo "✅ Postgres is up!"
-      containers:
-        - name: migrate
-          image: almuko/simpleapp:latest
-          command: ["sh", "-c", "goose -dir ./migrations postgres \"$DATABASE_URL\" up"]
-          env:
-            - name: DATABASE_URL
-              valueFrom:
-                secretKeyRef:
-                  name: simpleapp-db-secret
-                  key: url
+type: Opaque
+stringData:
+  url: "postgres://postgres:Zxcvbnm123@postgres:5432/simpleapp?sslmode=disable"
 ---
 apiVersion: apps/v1
 kind: Deployment

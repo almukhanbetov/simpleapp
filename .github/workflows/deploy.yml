@@ -37,64 +37,36 @@ jobs:
       - name: Install kubectl
         uses: azure/setup-kubectl@v4
         with:
-          version: 'latest'
+          version: latest
 
       - name: Setup Kubeconfig
         shell: bash
         run: |
-          mkdir -p "$HOME/.kube"
-          cat > "$HOME/.kube/config" <<'EOF'
+          mkdir -p $HOME/.kube
+          cat > $HOME/.kube/config <<'EOF'
           ${{ secrets.KUBECONFIG }}
           EOF
 
-      - name: Deploy ClusterIssuer (Let's Encrypt)
-        run: kubectl apply --validate=false -f k8s/cluster-issuer.yaml
-
-      - name: Deploy Postgres (only if not exists)
+      # 🔄 Запуск миграций
+      - name: Run DB migrations
         run: |
-          if ! kubectl get statefulset postgres -n default >/dev/null 2>&1; then
-            echo "📦 Postgres not found. Creating..."
-            kubectl apply -f k8s/postgres.yaml
-            kubectl rollout status statefulset/postgres -n default --timeout=180s
-          else
-            echo "✅ Postgres already exists. Skipping creation."
+          set -e
+          kubectl delete job simpleapp-migrate -n default --ignore-not-found=true
+          kubectl apply -f k8s/migrate.yaml -n default
+          # ждем завершения
+          if ! kubectl wait --for=condition=complete job/simpleapp-migrate -n default --timeout=120s; then
+            echo "❌ Migration job failed. Dumping debug info..."
+            kubectl describe job simpleapp-migrate -n default || true
+            kubectl get pods -n default -l job-name=simpleapp-migrate -o wide || true
+            kubectl logs job/simpleapp-migrate -n default || true
+            exit 1
           fi
+          echo "✅ Migration job completed successfully."
+          echo "📜 Logs from migration job:"
+          kubectl logs job/simpleapp-migrate -n default
 
-      - name: Recreate simpleapp-db-secret
+      # 🚀 Деплой приложения
+      - name: Deploy SimpleApp
         run: |
-          kubectl delete secret simpleapp-db-secret -n default --ignore-not-found
-          kubectl create secret generic simpleapp-db-secret             -n default             --from-literal=url="postgres://postgres:Zxcvbnm123@postgres:5432/simpleapp?sslmode=disable"
-
-      - name: Cleanup old migration job (if exists)
-        run: |
-          if kubectl get job simpleapp-migrate -n default >/dev/null 2>&1; then
-            echo "🧹 Deleting old migration job..."
-            kubectl delete job simpleapp-migrate -n default
-          fi
-
-      - name: Deploy App (Migrations + Deployment + Service + Ingress)
-        run: kubectl apply -f k8s/simpleapp.yaml
-
-      - name: Wait for migrations to complete
-        run: |
-          sleep 5
-          kubectl wait --for=condition=complete job/simpleapp-migrate -n default --timeout=300s ||             (echo "❌ Migrations job did not complete" && kubectl logs job/simpleapp-migrate -n default && exit 1)
-
-      - name: Wait for app rollout
-        run: kubectl rollout status deployment/simpleapp -n default --timeout=300s
-
-      - name: Wait for TLS certificate
-        run: |
-          echo "⏳ Waiting for TLS certificate simpleapp-tls..."
-          kubectl wait --for=condition=Ready certificate/simpleapp-tls -n default --timeout=300s ||             (echo "❌ TLS certificate was not issued" && kubectl describe certificate simpleapp-tls -n default && exit 1)
-
-      - name: Test API health endpoint
-        run: |
-          echo "🌍 Testing API endpoint..."
-          curl -vk --retry 5 --retry-delay 10 https://simpleapp.compnet.kz/health | grep '"status":"ok"'
-
-      - name: Show Ingress and endpoints
-        run: |
-          kubectl get ingress -n default
-          kubectl get svc -n default
-          kubectl get pods -o wide -n default
+          kubectl apply -f k8s/simpleapp.yaml -n default
+          kubectl rollout status deployment/simpleapp -n default
