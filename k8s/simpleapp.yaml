@@ -5,7 +5,7 @@ metadata:
   namespace: default
 type: Opaque
 stringData:
-  url: "postgres://postgres:Zxcvbnm123@postgres:5432/simpleapp?sslmode=disable"
+  DATABASE_URL: "postgres://postgres:Zxcvbnm123@postgres:5432/simpleapp?sslmode=disable"
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -32,7 +32,7 @@ spec:
               valueFrom:
                 secretKeyRef:
                   name: simpleapp-db-secret
-                  key: url
+                  key: DATABASE_URL
 ---
 apiVersion: v1
 kind: Service

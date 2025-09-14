@@ -5,7 +5,7 @@ metadata:
   namespace: default
 spec:
   backoffLimit: 3
-  ttlSecondsAfterFinished: 60   # 👈 авто-очистка через 60 сек
+  ttlSecondsAfterFinished: 60
   template:
     spec:
       restartPolicy: Never
@@ -31,4 +31,4 @@ spec:
               valueFrom:
                 secretKeyRef:
                   name: simpleapp-db-secret
-                  key: url
+                  key: DATABASE_URL
