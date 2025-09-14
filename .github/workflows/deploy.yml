@@ -50,35 +50,41 @@ jobs:
       - name: Deploy ClusterIssuer (Let's Encrypt)
         run: kubectl apply --validate=false -f k8s/cluster-issuer.yaml
 
-
       - name: Deploy Postgres (only if not exists)
         run: |
           if ! kubectl get statefulset postgres -n default >/dev/null 2>&1; then
-            echo "Postgres not found. Creating..."
+            echo "📦 Postgres not found. Creating..."
             kubectl apply -f k8s/postgres.yaml
             kubectl rollout status statefulset/postgres -n default --timeout=180s
           else
-            echo "Postgres already exists. Skipping creation."
+            echo "✅ Postgres already exists. Skipping creation."
           fi
+
+      - name: Recreate simpleapp-db-secret
+        run: |
+          kubectl delete secret simpleapp-db-secret -n default --ignore-not-found
+          kubectl create secret generic simpleapp-db-secret \
+            -n default \
+            --from-literal=url="postgres://postgres:Zxcvbnm123@postgres:5432/simpleapp?sslmode=disable"
 
       - name: Cleanup old migration job (if exists)
         run: |
           if kubectl get job simpleapp-migrate -n default >/dev/null 2>&1; then
-            echo "Deleting old migration job..."
+            echo "🧹 Deleting old migration job..."
             kubectl delete job simpleapp-migrate -n default
           fi
 
-      - name: Deploy App (Secret + Migrations + Deployment + Service + Ingress)
+      - name: Deploy App (Migrations + Deployment + Service + Ingress)
         run: kubectl apply -f k8s/simpleapp.yaml
 
       - name: Wait for migrations to complete
         run: |
           sleep 5
-          kubectl wait --for=condition=complete job/simpleapp-migrate -n default --timeout=180s || \
+          kubectl wait --for=condition=complete job/simpleapp-migrate -n default --timeout=300s || \
             (echo "❌ Migrations job did not complete" && kubectl logs job/simpleapp-migrate -n default && exit 1)
 
       - name: Wait for app rollout
-        run: kubectl rollout status deployment/simpleapp -n default --timeout=180s
+        run: kubectl rollout status deployment/simpleapp -n default --timeout=300s
 
       - name: Wait for TLS certificate
         run: |
