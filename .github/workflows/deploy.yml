@@ -47,7 +47,14 @@ jobs:
           ${{ secrets.KUBECONFIG }}
           EOF
 
-      # 🔄 Запуск миграций
+      # 👇 Добавленный шаг
+      - name: Ensure DB Secret exists
+        run: |
+          kubectl delete secret simpleapp-db-secret -n default --ignore-not-found
+          kubectl create secret generic simpleapp-db-secret \
+            -n default \
+            --from-literal=DATABASE_URL="postgres://postgres:Zxcvbnm123@postgres:5432/simpleapp?sslmode=disable"
+
       - name: Run DB migrations
         run: |
           set -e
@@ -65,7 +72,6 @@ jobs:
           echo "📜 Logs from migration job:"
           kubectl logs job/simpleapp-migrate -n default
 
-      # 🚀 Деплой приложения
       - name: Deploy SimpleApp
         run: |
           kubectl apply -f k8s/simpleapp.yaml -n default
