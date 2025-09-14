@@ -1,3 +1,11 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: simpleapp-db-secret
+  namespace: default
+type: Opaque
+stringData:
+  url: "postgres://postgres:Zxcvbnm123@postgres:5432/simpleapp?sslmode=disable"
 ---
 apiVersion: batch/v1
 kind: Job
@@ -12,28 +20,17 @@ spec:
       initContainers:
         - name: wait-for-postgres
           image: busybox
-          command:
-            - sh
-            - -c
-            - |
-              until nc -z postgres 5432; do
-                echo "⏳ waiting for postgres..."
-                sleep 2
-              done
-              echo "✅ postgres is up!"
+          command: ['sh', '-c', 'until nc -z postgres 5432; do echo waiting for postgres; sleep 2; done;']
       containers:
         - name: migrate
           image: almuko/simpleapp:latest
-          command:
-            - sh
-            - -c
-            - goose -dir ./migrations postgres "$DATABASE_URL" up
+          command: ["sh", "-c", "goose -dir ./migrations postgres \"$DATABASE_URL\" up"]
           env:
             - name: DATABASE_URL
-              value: postgres://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@postgres:5432/$(POSTGRES_DB)?sslmode=disable
-          envFrom:
-            - secretRef:
-                name: postgres-secret
+              valueFrom:
+                secretKeyRef:
+                  name: simpleapp-db-secret
+                  key: url
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -51,16 +48,16 @@ spec:
         app: simpleapp
     spec:
       containers:
-        - name: simpleapp
+        - name: app
           image: almuko/simpleapp:latest
           ports:
             - containerPort: 8080
           env:
             - name: DATABASE_URL
-              value: postgres://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@postgres:5432/$(POSTGRES_DB)?sslmode=disable
-          envFrom:
-            - secretRef:
-                name: postgres-secret
+              valueFrom:
+                secretKeyRef:
+                  name: simpleapp-db-secret
+                  key: url
 ---
 apiVersion: v1
 kind: Service
@@ -82,12 +79,7 @@ metadata:
   namespace: default
   annotations:
     kubernetes.io/ingress.class: traefik
-    cert-manager.io/cluster-issuer: letsencrypt-prod
 spec:
-  tls:
-    - hosts:
-        - simpleapp.compnet.kz
-      secretName: simpleapp-tls
   rules:
     - host: simpleapp.compnet.kz
       http:

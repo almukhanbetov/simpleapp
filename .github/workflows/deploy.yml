@@ -63,9 +63,7 @@ jobs:
       - name: Recreate simpleapp-db-secret
         run: |
           kubectl delete secret simpleapp-db-secret -n default --ignore-not-found
-          kubectl create secret generic simpleapp-db-secret \
-            -n default \
-            --from-literal=url="postgres://postgres:Zxcvbnm123@postgres:5432/simpleapp?sslmode=disable"
+          kubectl create secret generic simpleapp-db-secret             -n default             --from-literal=url="postgres://postgres:Zxcvbnm123@postgres:5432/simpleapp?sslmode=disable"
 
       - name: Cleanup old migration job (if exists)
         run: |
@@ -80,8 +78,7 @@ jobs:
       - name: Wait for migrations to complete
         run: |
           sleep 5
-          kubectl wait --for=condition=complete job/simpleapp-migrate -n default --timeout=300s || \
-            (echo "❌ Migrations job did not complete" && kubectl logs job/simpleapp-migrate -n default && exit 1)
+          kubectl wait --for=condition=complete job/simpleapp-migrate -n default --timeout=300s ||             (echo "❌ Migrations job did not complete" && kubectl logs job/simpleapp-migrate -n default && exit 1)
 
       - name: Wait for app rollout
         run: kubectl rollout status deployment/simpleapp -n default --timeout=300s
@@ -89,8 +86,7 @@ jobs:
       - name: Wait for TLS certificate
         run: |
           echo "⏳ Waiting for TLS certificate simpleapp-tls..."
-          kubectl wait --for=condition=Ready certificate/simpleapp-tls -n default --timeout=300s || \
-            (echo "❌ TLS certificate was not issued" && kubectl describe certificate simpleapp-tls -n default && exit 1)
+          kubectl wait --for=condition=Ready certificate/simpleapp-tls -n default --timeout=300s ||             (echo "❌ TLS certificate was not issued" && kubectl describe certificate simpleapp-tls -n default && exit 1)
 
       - name: Test API health endpoint
         run: |
