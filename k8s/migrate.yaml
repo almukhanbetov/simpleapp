@@ -5,7 +5,7 @@ metadata:
   namespace: default
 spec:
   backoffLimit: 3
-  ttlSecondsAfterFinished: 60
+  #ttlSecondsAfterFinished: 60
   template:
     spec:
       restartPolicy: Never
